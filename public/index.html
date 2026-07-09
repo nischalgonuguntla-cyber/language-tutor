@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Coding Tutor - Voice & Vision</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #chat-container {
+            width: 100%;
+            max-width: 900px;
+            background-color: #313244;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+        }
+        #chat-box {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .message {
+            padding: 12px 18px;
+            border-radius: 8px;
+            max-width: 80%;
+            white-space: pre-wrap; 
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .user-message {
+            background-color: #89b4fa;
+            color: #11111b;
+            align-self: flex-end;
+        }
+        .ai-message {
+            background-color: #45475a;
+            color: #cdd6f4;
+            align-self: flex-start;
+            border-left: 4px solid #a6e3a1;
+        }
+        #input-container {
+            display: flex;
+            padding: 15px;
+            background-color: #181825;
+            border-bottom-left-radius: 10px;
+            border-bottom-right-radius: 10px;
+            gap: 10px;
+        }
+        #user-input {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #313244;
+            color: white;
+            font-size: 16px;
+        }
+        #user-input:focus { outline: 2px solid #89b4fa; }
+        button {
+            padding: 15px 15px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+            color: #11111b;
+        }
+        #share-btn { background-color: #f9e2af; }
+        #mic-btn { background-color: #cba6f7; }
+        #send-btn { background-color: #a6e3a1; }
+        button:hover { filter: brightness(1.1); }
+    </style>
+</head>
+<body>
+
+    <div id="chat-container">
+        <div id="chat-box">
+            <div class="message ai-message">RASIEL System Online. Share your screen and ask me a question!</div>
+        </div>
+        
+        <video id="screenVideo" playsinline autoplay muted style="display: none;"></video>
+        <canvas id="hiddenCanvas" style="display: none;"></canvas>
+
+        <div id="input-container">
+            <button onclick="startScreenShare()" id="share-btn">📺 Share Screen</button>
+            <button onclick="startListening()" id="mic-btn">🎤 Speak</button>
+            <input type="text" id="user-input" placeholder="Ask about your code..." autocomplete="off" onkeypress="handleEnter(event)">
+            <button onclick="sendMessage()" id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let videoStream = null;
+        let usedMic = false; // ✨ Tracks if the user spoke out loud
+
+        // --- 1. SCREEN SHARE LOGIC ---
+        async function startScreenShare() {
+            try {
+                videoStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                const videoElement = document.getElementById('screenVideo');
+                videoElement.srcObject = videoStream;
+                
+                // ✨ FIX: Force the hidden video to play so it actually generates frames
+                await videoElement.play(); 
+                
+                const shareBtn = document.getElementById('share-btn');
+                shareBtn.innerText = "🔴 Screen Shared";
+                shareBtn.style.backgroundColor = "#f38ba8";
+                shareBtn.style.color = "white";
+                
+                videoStream.getVideoTracks()[0].onended = () => {
+                    videoStream = null;
+                    shareBtn.innerText = "📺 Share Screen";
+                    shareBtn.style.backgroundColor = "#f9e2af";
+                    shareBtn.style.color = "#11111b";
+                };
+            } catch (err) {
+                alert("Could not share screen. Please allow permissions.");
+            }
+        }
+
+        function captureFrame() {
+            if (!videoStream) return null; 
+            const video = document.getElementById('screenVideo');
+            
+            // ✨ FIX: Ensure the video actually has dimensions before snapping a picture
+            if (video.videoWidth === 0 || video.videoHeight === 0) {
+                console.warn("Video stream not fully loaded yet.");
+                return null;
+            }
+
+            const canvas = document.getElementById('hiddenCanvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL('image/jpeg', 0.7);
+        }
+
+        // --- 2. MICROPHONE & VOICE LOGIC ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+
+        function startListening() {
+            const micBtn = document.getElementById('mic-btn');
+            micBtn.innerText = "🎙️ Listening...";
+            micBtn.style.backgroundColor = "#f38ba8";
+            micBtn.style.color = "white";
+            
+            window.speechSynthesis.cancel(); // Stop AI if it's currently talking
+            
+            usedMic = true; // ✨ Remember that the user used their voice
+            recognition.start();
+        }
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            
+            // ✨ FIX: Just put the text in the box. Do NOT auto-send.
+            document.getElementById('user-input').value = transcript; 
+            
+            const micBtn = document.getElementById('mic-btn');
+            micBtn.innerText = "🎤 Speak";
+            micBtn.style.backgroundColor = "#cba6f7";
+            micBtn.style.color = "#11111b";
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Mic error:", event.error);
+            const micBtn = document.getElementById('mic-btn');
+            micBtn.innerText = "🎤 Speak";
+            micBtn.style.backgroundColor = "#cba6f7";
+        };
+
+        function speakOutLoud(text) {
+            const cleanText = text.replace(/[*`#]/g, ''); // Remove coding symbols
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            utterance.rate = 1.05; 
+            utterance.pitch = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // --- 3. SEND TO BACKEND ---
+        async function sendMessage() {
+            const inputField = document.getElementById('user-input');
+            const chatBox = document.getElementById('chat-box');
+            const message = inputField.value.trim();
+            if (!message) return;
+
+            const currentScreenshot = captureFrame();
+
+            chatBox.innerHTML += `<div class="message user-message">${message} ${currentScreenshot ? '<br><br>📸 <i>[Screenshot Attached]</i>' : ''}</div>`;
+            inputField.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const loadingId = 'loading-' + Date.now();
+            chatBox.innerHTML += `<div id="${loadingId}" class="message ai-message">Analyzing screen...</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message, image: currentScreenshot })
+                });
+
+                const data = await response.json();
+                const aiReply = data.reply || data.error;
+                
+                document.getElementById(loadingId).innerText = aiReply;
+                
+                // ✨ FIX: Only speak out loud if the user asked via microphone!
+                if (usedMic) {
+                    speakOutLoud(aiReply);
+                    usedMic = false; // Reset it for the next message
+                }
+
+            } catch (error) {
+                document.getElementById(loadingId).innerText = "Error connecting to server.";
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function handleEnter(event) {
+            if (event.key === "Enter") sendMessage();
+        }
+    </script>
+</body>
+</html>

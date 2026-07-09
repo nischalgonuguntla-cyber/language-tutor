@@ -1,0 +1,82 @@
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+/* Changed body to allow the chat to take over */
+body { background: transparent; height: 100vh; width: 100vw; overflow: hidden; margin: 0; }
+
+/* ✨ NEW: Fullscreen Chat Container with a glass effect */
+.chat-container { 
+    width: 100vw; 
+    max-width: 100%; 
+    height: 100vh; 
+    background: rgba(255, 255, 255, 0.90); /* Slightly transparent */
+    backdrop-filter: blur(8px); /* Frosted glass effect */
+    display: flex; 
+    flex-direction: column; 
+    overflow: hidden; 
+    border-radius: 0; /* Removed rounded edges for fullscreen */
+}
+
+.chat-header { background: #4f46e5; color: white; padding: 20px; text-align: center; }
+.chat-header p { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+.chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: transparent; }
+.message { max-width: 80%; padding: 12px 16px; border-radius: 16px; font-size: 15px; line-height: 1.4; }
+.user { background: #4f46e5; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+.assistant { background: #e5e7eb; color: #1f2937; align-self: flex-start; border-bottom-left-radius: 4px; }
+.loading { font-style: italic; color: #6b7280; }
+.input-area { display: flex; padding: 15px; background: white; border-top: 1px solid #e5e7eb; gap: 10px; }
+input { flex: 1; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; font-size: 15px; }
+input:focus { border-color: #4f46e5; }
+button { background: #4f46e5; color: white; border: none; padding: 0 20px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+button:hover { background: #4338ca; }
+
+/* =========================================
+   ✨ ANIMATIONS 
+   ========================================= */
+
+/* 1. Message Slide & Fade In */
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.message {
+    animation: slideUp 0.3s ease-out forwards;
+}
+
+/* 2. Microphone Pulsing Effect */
+@keyframes pulseGlow {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.listening {
+    background: #ef4444 !important;
+    color: white !important;
+    animation: pulseGlow 1.5s infinite; 
+}
+
+/* 3. Bouncing Typing Dots */
+.typing-indicator {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 12px 16px;
+    width: fit-content;
+}
+
+.typing-indicator span {
+    width: 8px;
+    height: 8px;
+    background-color: #6b7280;
+    border-radius: 50%;
+    animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1); }
+}
