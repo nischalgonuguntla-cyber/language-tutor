@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Coding Tutor - Voice & Text</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #chat-container {
+            width: 100%;
+            max-width: 900px;
+            background-color: #313244;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+        }
+        #chat-box {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .message {
+            padding: 12px 18px;
+            border-radius: 8px;
+            max-width: 80%;
+            white-space: pre-wrap; 
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .user-message {
+            background-color: #89b4fa;
+            color: #11111b;
+            align-self: flex-end;
+        }
+        .ai-message {
+            background-color: #45475a;
+            color: #cdd6f4;
+            align-self: flex-start;
+            border-left: 4px solid #a6e3a1;
+        }
+        #input-container {
+            display: flex;
+            padding: 15px;
+            background-color: #181825;
+            border-bottom-left-radius: 10px;
+            border-bottom-right-radius: 10px;
+            gap: 10px;
+        }
+        #user-input {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #313244;
+            color: white;
+            font-size: 16px;
+        }
+        #user-input:focus { outline: 2px solid #89b4fa; }
+        button {
+            padding: 15px 15px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+            color: #11111b;
+        }
+        #mic-btn { background-color: #cba6f7; }
+        #send-btn { background-color: #a6e3a1; }
+        button:hover { filter: brightness(1.1); }
+    </style>
+</head>
+<body>
+
+    <div id="chat-container">
+        <div id="chat-box">
+            <div class="message ai-message">RASIEL System Online. Ask me a question!</div>
+        </div>
+        
+        <div id="input-container">
+            <button onclick="startListening()" id="mic-btn">🎤 Speak</button>
+            <input type="text" id="user-input" placeholder="Ask about your code..." autocomplete="off" onkeypress="handleEnter(event)">
+            <button onclick="sendMessage()" id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let usedMic = false; // Tracks if the user spoke out loud
+
+        // --- MICROPHONE & VOICE LOGIC ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+
+        function startListening() {
+            const micBtn = document.getElementById('mic-btn');
+            micBtn.innerText = "🎙️ Listening...";
+            micBtn.style.backgroundColor = "#f38ba8";
+            micBtn.style.color = "white";
+            
+            window.speechSynthesis.cancel(); // Stop AI if it's currently talking
+            
+            usedMic = true; 
+            recognition.start();
+        }
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            
+            document.getElementById('user-input').value = transcript; 
+            
+            const micBtn = document.getElementById('mic-btn');
+            micBtn.innerText = "🎤 Speak";
+            micBtn.style.backgroundColor = "#cba6f7";
+            micBtn.style.color = "#11111b";
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Mic error:", event.error);
+            const micBtn = document.getElementById('mic-btn');
+            micBtn.innerText = "🎤 Speak";
+            micBtn.style.backgroundColor = "#cba6f7";
+        };
+
+        function speakOutLoud(text) {
+            const cleanText = text.replace(/[*`#]/g, ''); // Remove coding symbols
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            utterance.rate = 1.05; 
+            utterance.pitch = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // --- SEND TO BACKEND ---
+        async function sendMessage() {
+            const inputField = document.getElementById('user-input');
+            const chatBox = document.getElementById('chat-box');
+            const message = inputField.value.trim();
+            if (!message) return;
+
+            chatBox.innerHTML += `<div class="message user-message">${message}</div>`;
+            inputField.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const loadingId = 'loading-' + Date.now();
+            chatBox.innerHTML += `<div id="${loadingId}" class="message ai-message">Thinking...</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    // Image payload removed
+                    body: JSON.stringify({ message: message }) 
+                });
+
+                const data = await response.json();
+                const aiReply = data.reply || data.error;
+                
+                document.getElementById(loadingId).innerText = aiReply;
+                
+                if (usedMic) {
+                    speakOutLoud(aiReply);
+                    usedMic = false; // Reset it for the next message
+                }
+
+            } catch (error) {
+                document.getElementById(loadingId).innerText = "Error connecting to server.";
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function handleEnter(event) {
+            if (event.key === "Enter") sendMessage();
+        }
+    </script>
+</body>
+</html>
